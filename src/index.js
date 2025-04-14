@@ -22,48 +22,72 @@ if (!API_TOKEN || !API_SECRET) {
 app.use(bodyParser.json());
 
 // 📤 Upload and Verify Image
-app.post("/api/upload-veriff-image", upload.single("image"), async (req, res) => {
-  try {
-    const imageBuffer = req.file.buffer;
-    const imageName = req.file.originalname;
+app.post(
+  "/api/upload-veriff-image",
+  upload.fields([{ name: "front", maxCount: 1 }, { name: "back", maxCount: 1 }]),
+  async (req, res) => {
+    try {
+      const frontImageBuffer = req.files.front[0].buffer;
+      const backImageBuffer = req.files.back[0].buffer;
+      // Step 1: Start Veriff session
+      const session = await startVerificationSession();
+      const verificationId = session?.verification?.id;
+      console.log("Started session ID:", verificationId);
 
-    // Step 1: Start Veriff session
-    const session = await startVerificationSession();
-    const verificationId = session?.verification?.id;
-    console.log("Started session ID:", verificationId);
+      // Step 2: Upload images to Veriff
+      const frontImagePayloadObj = {
+        image: {
+          context: "document-front",
+          content: Buffer.from(frontImageBuffer).toString("base64"),
+          timestamp: timestamp(),
+        },
+      };
+      const frontImagePayloadStr = JSON.stringify(frontImagePayloadObj);
 
-    // Step 2: Upload image to Veriff
-    const imagePayloadObj = {
-      image: {
-        context: imageName.split(".")[0],
-        content: Buffer.from(imageBuffer).toString("base64"),
-        timestamp: timestamp(),
-      },
-    };
-    const imagePayloadStr = JSON.stringify(imagePayloadObj);
+      const backImagePayloadObj = {
+        image: {
+          context: "document-back",
+          content: Buffer.from(backImageBuffer).toString("base64"),
+          timestamp: timestamp(),
+        },
+      };
+      const backImagePayloadStr = JSON.stringify(backImagePayloadObj);
 
-    const imageHeaders = {
-      "x-auth-client": API_TOKEN,
-      "x-hmac-signature": generateSignature(imagePayloadStr, API_SECRET),
-      "content-type": "application/json",
-    };
+      const frontImageHeaders = {
+        "x-auth-client": API_TOKEN,
+        "x-hmac-signature": generateSignature(frontImagePayloadStr, API_SECRET),
+        "content-type": "application/json",
+      };
 
-    await fetch(`${API_URL}/sessions/${verificationId}/media`, {
-      method: "POST",
-      headers: imageHeaders,
-      body: imagePayloadStr,
-    });
+      const backImageHeaders = {
+        "x-auth-client": API_TOKEN,
+        "x-hmac-signature": generateSignature(backImagePayloadStr, API_SECRET),
+        "content-type": "application/json",
+      };
 
-    // Step 3: Submit verification
-    const response = await endVerification(verificationId);
-    console.log("End verification response:", response);
+      await fetch(`${API_URL}/sessions/${verificationId}/media`, {
+        method: "POST",
+        headers: frontImageHeaders,
+        body: frontImagePayloadStr,
+      });
 
-    res.json({ status: "submitted", verificationId });
-  } catch (error) {
-    console.error("Verification failed:", error);
-    res.status(500).json({ error: "Verification failed" });
+      await fetch(`${API_URL}/sessions/${verificationId}/media`, {
+        method: "POST",
+        headers: backImageHeaders,
+        body: backImagePayloadStr,
+      });
+
+      // Step 3: Submit verification
+      const response = await endVerification(verificationId);
+      console.log("End verification response:", response);
+
+      res.json({ status: "submitted", verificationId });
+    } catch (error) {
+      console.error("Verification failed:", error);
+      res.status(500).json({ error: "Verification failed" });
+    }
   }
-});
+);
 
 // ✅ Veriff Webhook (Optional)
 app.post("/verification", (req, res) => {
@@ -81,36 +105,7 @@ app.post("/verification", (req, res) => {
     payload,
   });
 
-  console.log(payload?.data?.verification,"this is verification data")
-  if (payload?.data?.verification?.status === "approved") {
-    console.log("Verification approved");
-  } else if (payload?.data?.verification?.status === "declined") {
-    console.log("Verification declined");
-  }
-  if (payload?.data?.verification?.status === "pending") {
-    console.log("Verification pending");
-  }
-  if (payload?.data?.verification?.status === "submitted") {
-    console.log("Verification submitted");
-  }
-  if (payload?.data?.verification?.status === "error") {
-    console.log("Verification error");
-  }
-  if (payload?.data?.verification?.status === "done") {
-    console.log("Verification done");
-  }
-  if (payload?.data?.verification?.status === "cancelled") {
-    console.log("Verification cancelled");
-  }
-  if (payload?.data?.verification?.status === "timeout") {
-    console.log("Verification timeout");
-  }
-  if (payload?.data?.verification?.status === "started") {
-    console.log("Verification started");
-  }
-  if (payload?.data?.verification?.status === "document") {
-    console.log("Verification document");
-  }
+ 
 
   res.json({ status: "success" });
 });
@@ -139,21 +134,9 @@ function isSignatureValid({ signature, secret, payload }) {
   const digest = generateSignature(payloadStr, secret);
   return digest === signature.toLowerCase();
 }
-
 async function startVerificationSession() {
   const payloadObj = {
     verification: {
-      person: {
-        firstName: "John",
-        lastName: "Doe",
-        idNumber: "ABC123",
-      },
-      document: {
-        number: "DOC123456",
-        type: "PASSPORT",
-        country: "US",
-      },
-      lang: "en",
       features: ["selfid"],
       timestamp: timestamp(),
     },
