@@ -81,6 +81,37 @@ app.post("/verification", (req, res) => {
     payload,
   });
 
+  console.log(payload?.data?.verification,"this is verification data")
+  if (payload?.data?.verification?.status === "approved") {
+    console.log("Verification approved");
+  } else if (payload?.data?.verification?.status === "declined") {
+    console.log("Verification declined");
+  }
+  if (payload?.data?.verification?.status === "pending") {
+    console.log("Verification pending");
+  }
+  if (payload?.data?.verification?.status === "submitted") {
+    console.log("Verification submitted");
+  }
+  if (payload?.data?.verification?.status === "error") {
+    console.log("Verification error");
+  }
+  if (payload?.data?.verification?.status === "done") {
+    console.log("Verification done");
+  }
+  if (payload?.data?.verification?.status === "cancelled") {
+    console.log("Verification cancelled");
+  }
+  if (payload?.data?.verification?.status === "timeout") {
+    console.log("Verification timeout");
+  }
+  if (payload?.data?.verification?.status === "started") {
+    console.log("Verification started");
+  }
+  if (payload?.data?.verification?.status === "document") {
+    console.log("Verification document");
+  }
+
   res.json({ status: "success" });
 });
 
