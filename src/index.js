@@ -105,7 +105,7 @@ app.post("/verification", (req, res) => {
     payload,
   });
 
- console.log("Webhook payload:..................", payload?.verification);
+ console.log("Webhook payload:..................", payload?.data?.verification);
 
   res.json({ status: "success" });
 });
