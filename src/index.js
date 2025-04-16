@@ -109,17 +109,25 @@ app.post("/verification", (req, res) => {
   res.json({ status: "success" });
 
 });
+function generateSignatureKey(sessionId, secret) {
+  return crypto.createHmac("sha256", secret).update(sessionId).digest("hex");
+}
+
 
 // ✅ Get Verification Decision
 app.get("/api/veriff-decision/:id", async (req, res) => {
   const { id } = req.params;
+  console.log("Veriff decision ID:", id);
+  if (!id) {
+    return res.status(400).json({ error: "Missing verification ID" });
+  }
   const headers = {
     "x-auth-client": API_TOKEN,
-    "x-hmac-signature": generateSignature(id, API_SECRET),
-    "content-type": "application/json",
+    "x-hmac-signature": generateSignatureKey(id, API_SECRET),
+   
   };
   try {
-    const response = await fetch(`${API_URL}/sessions/${id}/decision`, {
+    const response = await fetch(`${API_URL}/sessions/${id}/decision/fullauto?version=1.0.0`, {
       method: "GET",
       headers,
     });
