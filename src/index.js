@@ -105,11 +105,38 @@ app.post("/verification", (req, res) => {
     payload,
   });
 
- console.log("Webhook payload:..................", payload?.data?.verification);
-
+  console.log("Webhook payload:..................", payload?.data?.verification);
   res.json({ status: "success" });
+
 });
 
+// ✅ Get Verification Decision
+app.get("/api/veriff-decision/:id", async (req, res) => {
+  const { id } = req.params;
+  const headers = {
+    "x-auth-client": API_TOKEN,
+    "x-hmac-signature": generateSignature(id, API_SECRET),
+    "content-type": "application/json",
+  };
+  try {
+    const response = await fetch(`${API_URL}/sessions/${id}/decision`, {
+      method: "GET",
+      headers,
+    });
+
+    const decision = await response.json();
+    console.log("Decision:", decision);
+
+    res.json(decision);
+  } catch (error) {
+    console.error("Failed to get decision:", error);
+    res.status(500).json({
+      status: "fail",
+      code: "1815",
+      message: "Could not authenticate request.",
+    });
+  }
+});
 // 🌐 Start server
 app.listen(WEBHOOK_PORT, () => {
   console.log(`✅ Server running on http://localhost:${WEBHOOK_PORT}`);
