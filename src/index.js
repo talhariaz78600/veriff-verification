@@ -107,44 +107,39 @@ app.post("/verification", (req, res) => {
 
   console.log("Webhook payload:..................", payload?.data?.verification);
   res.json({ status: "success" });
-
 });
-function generateSignatureKey(sessionId, secret) {
-  return crypto.createHmac("sha256", secret).update(sessionId).digest("hex");
-}
-
 
 // ✅ Get Verification Decision
 app.get("/api/veriff-decision/:id", async (req, res) => {
   const { id } = req.params;
-  console.log("Veriff decision ID:", id);
-  if (!id) {
-    return res.status(400).json({ error: "Missing verification ID" });
-  }
+  if (!id) return res.status(400).json({ error: "Missing verification ID" });
+
+  // Ensure correct HMAC signature (adjust based on Veriff's requirements)
+  const timestamp = Date.now();
+  const signatureData = `${timestamp}${id}`;
   const headers = {
     "x-auth-client": API_TOKEN,
-    "x-hmac-signature": generateSignatureKey(id, API_SECRET),
-   
+    "x-hmac-signature": generateSignature(id, API_SECRET),
+    "x-timestamp": timestamp, // Include if required by Veriff
   };
+
   try {
-    const response = await fetch(`${API_URL}/sessions/${id}/decision/fullauto?version=1.0.0`, {
+    const response = await fetch(`${API_URL}/sessions/${id}/decision`, {
       method: "GET",
       headers,
     });
 
-    const decision = await response.json();
-    console.log("Decision:", decision);
+    if (response.status === 404) {
+      return res.status(424).json({ error: "Awaiting verification decision" });
+    }
 
+    const decision = await response.json();
     res.json(decision);
   } catch (error) {
-    console.error("Failed to get decision:", error);
-    res.status(500).json({
-      status: "fail",
-      code: "1815",
-      message: "Could not authenticate request.",
-    });
+    res.status(500).json({ error: "Failed to fetch decision" });
   }
 });
+
 // 🌐 Start server
 app.listen(WEBHOOK_PORT, () => {
   console.log(`✅ Server running on http://localhost:${WEBHOOK_PORT}`);
@@ -170,14 +165,23 @@ function isSignatureValid({ signature, secret, payload }) {
   return digest === signature.toLowerCase();
 }
 async function startVerificationSession() {
-  const payloadObj = {
+  const payload = {
     verification: {
+      person: {
+        firstName: "Nican Onio",
+        lastName: "Xander [EXAMPLE]",
+      },
+      document: {
+        type: "DRIVERS_LICENSE",
+        country: "US" // Set appropriate country code
+      },
+      lang: "en",
       features: ["selfid"],
       timestamp: timestamp(),
     },
   };
 
-  const payloadStr = JSON.stringify(payloadObj);
+  const payloadStr = JSON.stringify(payload);
 
   const headers = {
     "x-auth-client": API_TOKEN,
@@ -221,3 +225,4 @@ async function endVerification(verificationId) {
 
   return await response.json();
 }
+
